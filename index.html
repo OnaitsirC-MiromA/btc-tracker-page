@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>BTC Tracker</title>
+    <style>
+      :root { color-scheme: dark; --bg:#07111f; --card:rgba(11,22,40,.9); --line:rgba(255,255,255,.08); --text:#e8eef9; --muted:#8ca0c6; --accent:#f7931a; --good:#2dd4bf; --bad:#f87171; }
+      *{box-sizing:border-box} body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:radial-gradient(circle at top left,rgba(247,147,26,.18),transparent 28%),radial-gradient(circle at bottom right,rgba(45,212,191,.12),transparent 25%),linear-gradient(180deg,#08111d 0%,#050a12 100%);color:var(--text);min-height:100vh;display:grid;place-items:center;padding:24px} main{width:min(960px,100%);display:grid;gap:18px}.hero,.panel{background:var(--card);border:1px solid var(--line);border-radius:20px;box-shadow:0 30px 80px rgba(0,0,0,.35);backdrop-filter:blur(14px)}.hero{padding:28px}.eyebrow{display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border-radius:999px;background:rgba(247,147,26,.12);color:#ffd6a3;font-weight:600;letter-spacing:.02em;margin-bottom:16px}.dot{width:10px;height:10px;border-radius:999px;background:var(--good);box-shadow:0 0 0 6px rgba(45,212,191,.08)}h1{margin:0;font-size:clamp(2rem,4vw,4rem);line-height:1.02}p{color:var(--muted);line-height:1.6}.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}.panel{padding:20px}.label{color:var(--muted);font-size:.9rem;text-transform:uppercase;letter-spacing:.08em}.value{font-size:clamp(1.6rem,3vw,2.4rem);font-weight:800;margin-top:10px}.sub{margin-top:8px;color:var(--muted)}.price{color:var(--accent)}.delta.up{color:var(--good)}.delta.down{color:var(--bad)}.row{display:flex;gap:12px;flex-wrap:wrap;margin-top:18px}button{appearance:none;border:1px solid var(--line);background:rgba(255,255,255,.04);color:var(--text);border-radius:12px;padding:12px 16px;font:inherit;cursor:pointer}button:hover{background:rgba(255,255,255,.08)}#status{min-height:1.2em}@media (max-width:760px){.grid{grid-template-columns:1fr}.hero,.panel{border-radius:16px}}
+    </style>
+  </head>
+  <body>
+    <main>
+      <section class="hero">
+        <div class="eyebrow"><span class="dot"></span> Live BTC dashboard</div>
+        <h1>Bitcoin price, refreshed in real time.</h1>
+        <p>Static site served locally, tunneled publicly, and powered by a live fetch against a public market API.</p>
+      </section>
+      <section class="grid">
+        <article class="panel">
+          <div class="label">BTC / USD</div>
+          <div id="price" class="value price">Loading…</div>
+          <div id="status" class="sub">Fetching latest spot price.</div>
+        </article>
+        <article class="panel">
+          <div class="label">Last updated</div>
+          <div id="updated" class="value">—</div>
+          <div class="sub">Automatic refresh every 20 seconds.</div>
+        </article>
+        <article class="panel">
+          <div class="label">Connection</div>
+          <div id="connection" class="value">Online</div>
+          <div class="sub">If the API fails, the UI shows the error state below.</div>
+        </article>
+      </section>
+      <section class="panel">
+        <div class="label">Diagnostics</div>
+        <div id="diagnostic" class="value" style="font-size:1.1rem;font-weight:600;">Waiting for first fetch…</div>
+      </section>
+    </main>
+    <script>
+      const priceEl = document.getElementById('price');
+      const updatedEl = document.getElementById('updated');
+      const statusEl = document.getElementById('status');
+      const connectionEl = document.getElementById('connection');
+      const diagnosticEl = document.getElementById('diagnostic');
+      let lastPrice = null;
+      function fmtTime(d = new Date()) { return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }); }
+      async function refresh() {
+        statusEl.textContent = 'Fetching latest spot price.';
+        diagnosticEl.textContent = 'GET https://api.coinbase.com/v2/prices/BTC-USD/spot';
+        try {
+          const res = await fetch('https://api.coinbase.com/v2/prices/BTC-USD/spot', { cache: 'no-store' });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const data = await res.json();
+          const amount = Number(data?.data?.amount);
+          if (!Number.isFinite(amount)) throw new Error('Unexpected response shape');
+          priceEl.textContent = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 }).format(amount);
+          updatedEl.textContent = fmtTime();
+          statusEl.textContent = lastPrice == null ? 'First price loaded successfully.' : `Updated from ${lastPrice.toFixed(2)} to ${amount.toFixed(2)}.`;
+          connectionEl.textContent = 'Online';
+          diagnosticEl.textContent = `Source: Coinbase spot API · ${data.data.base} / ${data.data.currency}`;
+          lastPrice = amount;
+        } catch (err) {
+          connectionEl.textContent = 'Degraded';
+          statusEl.textContent = 'Unable to fetch live BTC data right now.';
+          diagnosticEl.textContent = `Fetch error: ${err.message}`;
+          if (lastPrice == null) priceEl.textContent = '—';
+        }
+      }
+      refresh();
+      setInterval(refresh, 20000);
+    </script>
+  </body>
+</html>
